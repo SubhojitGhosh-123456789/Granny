@@ -5,12 +5,14 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Share,
 } from "react-native";
 import db from "../config";
 import firebase from "firebase";
 import { Header, Icon, Card, Input } from "react-native-elements";
 import { RFValue } from "react-native-responsive-fontsize";
 import StarRating from "react-native-star-rating";
+import moment from "moment";
 
 export default class ViewScreen extends React.Component {
   constructor(props) {
@@ -25,6 +27,8 @@ export default class ViewScreen extends React.Component {
       steps: this.props.navigation.getParam("Details")["Steps"],
       surname: this.props.navigation.getParam("Details")["Surname"],
       time: this.props.navigation.getParam("Details")["Time"],
+      recipeid: this.props.navigation.getParam("Details")["RecipeID"],
+      views: this.props.navigation.getParam("Details")["Views"],
       starCount: 5,
 
       pname: firebase.auth().currentUser.displayName,
@@ -55,10 +59,10 @@ export default class ViewScreen extends React.Component {
   };
 
   componentDidMount() {
+    this.updateViews();
     this.getpName();
     this.getAverageRating();
     this.getCookRating();
-    this.updateBadge();
   }
 
   addNotification = async () => {
@@ -122,10 +126,10 @@ export default class ViewScreen extends React.Component {
 
           var sum = 0;
           for (var i = 0; i < rating.length; i++) {
-            sum += parseInt(rating[i], 10);
+            sum += rating[i];
           }
 
-          var avg = sum / rating.length;
+          var avg = Math.round(sum * 100) / 100 / rating.length;
 
           console.log(
             "The sum of all the elements is: " + sum + " The average is: " + avg
@@ -236,6 +240,31 @@ export default class ViewScreen extends React.Component {
       });
   };
 
+  updateViews = async () => {
+    await firebase
+      .firestore()
+      .collection("Recipes")
+      .where("Dish", "==", this.state.dish)
+      .where("Email", "==", this.state.email)
+      .where("UserName", "==", this.state.username)
+      .get()
+      .then((snapshot) => {
+        snapshot.forEach((doc) => {
+          var v = doc.data().Views;
+
+          firebase
+            .firestore()
+            .collection("Recipes")
+            .doc(doc.id)
+            .update({
+              Views: v + 1,
+            });
+
+          this.setState({ views: v + 1 });
+        });
+      });
+  };
+
   addRating = async () => {
     await firebase.firestore().collection("DishRatings").add({
       Dish: this.state.dish,
@@ -246,11 +275,49 @@ export default class ViewScreen extends React.Component {
     this.getAverageRating();
   };
 
+  share = async (message) => {
+    try {
+      const result = await Share.share({
+        message: message,
+      });
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          Share.open(result);
+        } else {
+          // shared
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // dismissed
+      }
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  saveRecipe = (id, dish, name) => {
+    var date = new Date().getDate();
+    var month = new Date().getMonth() + 1;
+    var year = new Date().getFullYear();
+
+    var currentDate = date + "/" + month + "/" + year;
+
+    var time = moment().utcOffset("+05:30").format(" hh:mm a");
+
+    firebase.firestore().collection("SavedRecipes").add({
+      Dish: dish,
+      SavedEmail: firebase.auth().currentUser.email,
+      RecipeID: id,
+      Date: currentDate,
+      Time: time,
+      By: name,
+    });
+  };
+
   render() {
     return (
       <View style={styles.container}>
         <Header
-          backgroundColor="#CC6600"
+          backgroundColor="#009999"
           leftComponent={
             <Icon
               name="arrow-left"
@@ -267,8 +334,62 @@ export default class ViewScreen extends React.Component {
         <ScrollView>
           <View style={{ flex: 1, marginBottom: 30 }}>
             <Card borderRadius={25}>
-              <Card.Title>{this.state.dish}</Card.Title>
+              <View
+                style={{
+                  justifyContent: "space-evenly",
+                  flexDirection: "row",
+                  marginBottom: 10,
+                }}
+              >
+                <Card.Title style={{ fontSize: 20 }}>
+                  {this.state.dish}
+                </Card.Title>
+                <Icon
+                  name="share-alt"
+                  size={30}
+                  color="blue"
+                  type="font-awesome"
+                  light
+                  onPress={() => {
+                    console.log("Shared");
+                    this.share(
+                      "Check Out " +
+                        this.state.username +
+                        " " +
+                        this.state.surname +
+                        "'s recipe " +
+                        this.state.dish +
+                        " By Downloading Granny now!! Here is the image of the recipe " +
+                        this.state.image
+                    );
+                  }}
+                />
+
+                <Icon
+                  name="bookmark"
+                  size={30}
+                  color="#660033"
+                  type="font-awesome"
+                  onPress={() => {
+                    this.saveRecipe(
+                      this.state.recipeid,
+                      this.state.dish,
+                      this.state.username
+                    );
+                    alert(
+                      "Thank You For Saving " +
+                        this.state.username +
+                        " " +
+                        this.state.surname +
+                        "'s recipe " +
+                        this.state.dish
+                    );
+                  }}
+                />
+              </View>
+
               <Card.Divider />
+
               <Card.Image
                 source={{ uri: this.state.image }}
                 style={{
@@ -316,6 +437,24 @@ export default class ViewScreen extends React.Component {
                   By {this.state.username} {this.state.surname}
                 </Text>
               </View>
+
+              <View
+                style={{
+                  marginBottom: RFValue(34),
+                }}
+              >
+                <Text
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    marginTop: 10,
+                    marginBottom: RFValue(34),
+                    color: "black",
+                  }}
+                >
+                  ~ {this.state.views} views
+                </Text>
+              </View>
               <Card.Divider />
               <View>
                 {this.state.average !== "" ? (
@@ -334,9 +473,8 @@ export default class ViewScreen extends React.Component {
               <StarRating
                 disabled={false}
                 maxStars={5}
-                fullStarColor={"yellow"}
+                fullStarColor={"#990000"}
                 containerStyle={{
-                  backgroundColor: "black",
                   alignItems: "center",
                   borderRadius: 20,
                 }}
@@ -352,7 +490,7 @@ export default class ViewScreen extends React.Component {
               <View style={{ marginTop: 20 }}>
                 <Input
                   label="Comment On The Recipe"
-                  labelStyle={{ fontWeight: "bold" }}
+                  labelStyle={{ fontWeight: "bold", color: "black" }}
                   numberOfLines={3}
                   multiline={true}
                   underlineColorAndroid="transparent"
@@ -397,7 +535,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignContent: "center",
-    backgroundColor: "#99FF99",
+    backgroundColor: "#CCCCFF",
   },
 
   logOutContainer: {
@@ -409,7 +547,7 @@ const styles = StyleSheet.create({
   logOutButton: {
     justifyContent: "center",
     width: 200,
-    backgroundColor: "#FF8000",
+    backgroundColor: "#004C99",
     height: 40,
     borderRadius: 5,
     alignItems: "center",

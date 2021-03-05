@@ -1,8 +1,16 @@
 import React, { Component } from "react";
-import { Text, View, StyleSheet, FlatList, Share, Image } from "react-native";
+import {
+  Text,
+  View,
+  StyleSheet,
+  FlatList,
+  Share,
+  Image,
+  TouchableOpacity,
+} from "react-native";
 import db from "../config";
 import firebase from "firebase";
-import { ListItem, Icon, SearchBar } from "react-native-elements";
+import { ListItem, Icon, SearchBar, Tile } from "react-native-elements";
 import { ScrollView } from "react-native-gesture-handler";
 import MyHeader from "../components/AppHeader";
 import { RFValue } from "react-native-responsive-fontsize";
@@ -54,7 +62,6 @@ export default class RecipeScreen extends React.Component {
   };
 
   componentDidMount() {
-    this.updateBadge();
     this.getCookRating();
     this.getRequestedItemsList();
   }
@@ -67,21 +74,21 @@ export default class RecipeScreen extends React.Component {
       .where("UserName", "==", firebase.auth().currentUser.displayName)
       .onSnapshot((snapshot) => {
         var recipes = snapshot.docs.map((document) => document.data());
-        this.setState({ recipes: recipes });
-        console.log(this.state.recipes);
+        this.setState({ no: recipes });
+        console.log(this.state.no);
 
         var rating = [];
 
-        this.state.recipes.map((item) => {
+        this.state.no.map((item) => {
           rating.push(item.Rating);
           console.log(rating);
 
           var sum = 0;
           for (var i = 0; i < rating.length; i++) {
-            sum += parseInt(rating[i], 10);
+            sum += rating[i];
           }
 
-          var avg = sum / rating.length;
+          var avg = Math.round(sum * 100) / 100 / rating.length;
 
           console.log(
             "The sum of all the elements is: " + sum + " The average is: " + avg
@@ -89,6 +96,7 @@ export default class RecipeScreen extends React.Component {
 
           this.setState({ cookr: avg });
           this.updateCookRating();
+          this.updateBadge();
         });
       });
   };
@@ -170,85 +178,101 @@ export default class RecipeScreen extends React.Component {
 
   renderItem = ({ item, i }) => {
     return (
-      <ListItem
-        key={i}
-        bottomDivider
-        underlayColor="transparent"
-        containerStyle={{ borderRadius: 15, margin: 10, elevation: 20 }}
+      <Tile
         onPress={() => {
           this.props.navigation.navigate("ViewScreen", {
             Details: item,
           });
         }}
-      >
-        <Image
-          style={{
-            width: 100,
-            height: 150,
-            borderRadius: 20,
-          }}
-          source={{ uri: item.Image }}
-        />
-        <ListItem.Content>
-          <ListItem.Title style={{ fontWeight: "bold" }}>
-            {item.Dish}
-          </ListItem.Title>
-          <ListItem.Subtitle>{item.Description}</ListItem.Subtitle>
-          <Text style={{ fontWeight: "bold", color: "blue" }}>
-            #{item.Time}
-          </Text>
-        </ListItem.Content>
-        <View>
-          <Icon
-            name="share"
-            size={30}
-            color="white"
-            type="font-awesome"
-            containerStyle={styles.button}
-            onPress={() => {
-              console.log("Shared");
-              this.share(
-                "Check Out " +
-                  item.UserName +
-                  " " +
-                  item.Surname +
-                  "'s recipe " +
-                  item.Dish +
-                  " By Downloading Granny now!! Here is the image of the recipe " +
-                  item.Image
-              );
-            }}
-          />
+        imageSrc={{ uri: item.Image }}
+        title={item.Dish}
+        featured
+        caption={item.Description}
+        titleStyle={{
+          position: "absolute",
+          bottom: 30,
+          left: 1,
+          color: "white",
 
-          <Icon
-            name="bookmark"
-            size={30}
-            color="white"
-            type="font-awesome"
-            containerStyle={[styles.button, { marginLeft: 10, marginTop: 10 }]}
-            onPress={() => {
-              this.saveRecipe(item.RecipeID, item.Dish, item.UserName);
-              alert(
-                "Thank You For Saving " +
-                  item.UserName +
-                  " " +
-                  item.Surname +
-                  "'s recipe " +
-                  item.Dish
-              );
-            }}
-          />
-        </View>
-      </ListItem>
+          color: "#FFFFFF",
+          paddingLeft: 10,
+          paddingRight: 30,
+          textShadowColor: "#585858",
+          textShadowOffset: { width: 5, height: 5 },
+          textShadowRadius: 10,
+        }}
+        captionStyle={{
+          position: "absolute",
+          bottom: 10,
+          left: 10,
+          color: "white",
+
+          color: "#FFFFFF",
+          paddingLeft: 1,
+          paddingRight: 30,
+          textShadowColor: "#585858",
+          textShadowOffset: { width: 5, height: 5 },
+          textShadowRadius: 10,
+        }}
+        contentContainerStyle={{ height: 70, position: "absolute", bottom: 10 }}
+      />
     );
   };
 
   filterSearch(text) {
     if (text) {
       const newData = this.state.list.filter((item) => {
-        const itemData = item.Time.toUpperCase();
-        const textData = text.toUpperCase();
-        return itemData.indexOf(textData) > -1;
+        var f = text.charAt(0).toUpperCase() + text.slice(1).toUpperCase();
+        if (
+          f === "B" ||
+          f === "BR" ||
+          f === "BRE" ||
+          f === "BREA" ||
+          f === "BREAK" ||
+          f === "BREAKF" ||
+          f === "BREAKFA" ||
+          f === "BREAKFAS" ||
+          f === "BREAKFAST"
+        ) {
+          const itemData = item.Time.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+        } else if (
+          f === "L" ||
+          f === "LU" ||
+          f === "LUN" ||
+          f === "LUNC" ||
+          f === "LUNCH"
+        ) {
+          const itemData = item.Time.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+        } else if (
+          f === "S" ||
+          f === "SN" ||
+          f === "SNA" ||
+          f === "SNAC" ||
+          f === "SNACK"
+        ) {
+          const itemData = item.Time.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+        } else if (
+          f === "D" ||
+          f === "DI" ||
+          f === "DIN" ||
+          f === "DINN" ||
+          f === "DINNE" ||
+          f === "DINNER"
+        ) {
+          const itemData = item.Time.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+        } else {
+          const itemData = item.Dish.toUpperCase();
+          const textData = text.toUpperCase();
+          return itemData.indexOf(textData) > -1;
+        }
       });
       this.setState({
         search: text,
@@ -259,15 +283,23 @@ export default class RecipeScreen extends React.Component {
     }
   }
 
+  goToTop = () => {
+    this.scroll.scrollTo({ x: 0, y: 0, animated: true });
+  };
+
   render() {
     return (
       <View style={styles.container}>
         <MyHeader title="Recipes" navigation={this.props.navigation} />
-        <ScrollView>
+        <ScrollView
+          ref={(c) => {
+            this.scroll = c;
+          }}
+        >
           <View style={{ flex: 1 }}>
             <View style={{ flex: 1, backgroundColor: "magenta" }}>
               <SearchBar
-                lightTheme
+                labelStyle={{ fontWeight: "bold" }}
                 placeholder="Dish Or Meal Time"
                 onChangeText={(text) => {
                   this.setState({ search: text });
@@ -278,19 +310,83 @@ export default class RecipeScreen extends React.Component {
             </View>
             {this.state.list.length === 0 ? (
               <View style={styles.subContainer}>
-                <Text>Please Check Your Internet Connection</Text>
+                <Text>No Recipes Uploaded</Text>
               </View>
             ) : (
-              <View>
+              <View style={{ backgroundColor: "#E1CAF7" }}>
                 <FlatList
                   keyExtractor={this.keyExtractor}
                   data={this.state.list}
                   renderItem={this.renderItem}
+                  style={{ marginBottom: 100 }}
                 />
               </View>
             )}
           </View>
         </ScrollView>
+        <View
+          style={{
+            position: "absolute",
+            right: 10,
+            bottom: 10,
+            flexDirection: "row",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Icon
+            name="plus"
+            size={20}
+            color="white"
+            type="font-awesome"
+            containerStyle={{
+              width: 50,
+              backgroundColor: "green",
+              height: 50,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowOpacity: 10.44,
+              shadowRadius: 70.32,
+              elevation: 20,
+              alignSelf: "center",
+              color: "white",
+              borderRadius: 100,
+            }}
+            onPress={() => {
+              this.props.navigation.navigate("Add");
+            }}
+          />
+        </View>
+
+        <View
+          style={{
+            position: "absolute",
+            left: 10,
+            bottom: 10,
+            flexDirection: "row",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Icon
+            name="angle-double-up"
+            size={35}
+            color="white"
+            type="font-awesome"
+            containerStyle={{
+              width: 40,
+              backgroundColor: "green",
+              height: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowOpacity: 10.44,
+              shadowRadius: 70.32,
+              elevation: 20,
+              alignSelf: "center",
+              color: "white",
+              borderRadius: 100,
+            }}
+            onPress={this.goToTop}
+          />
+        </View>
       </View>
     );
   }
@@ -301,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignContent: "center",
-    backgroundColor: "#99FF99",
+    backgroundColor: "#E1CAF7",
   },
 
   logost: {
@@ -319,7 +415,7 @@ const styles = StyleSheet.create({
   },
   button: {
     width: 50,
-    backgroundColor: "#fb5b5a",
+    backgroundColor: "#FF6666",
     height: 50,
     alignItems: "center",
     justifyContent: "center",
